@@ -1,0 +1,54 @@
+# Binaries
+yuno-tui
+yuno-gui
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build output
+/output/
+*.iso
+*.img
+
+# Go
+/vendor/
+go.sum
+
+# Cache
+/var/cache/
+*.cache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build directories
+/build/
+/dist/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+
+# Testing
+coverage.out
+*.test

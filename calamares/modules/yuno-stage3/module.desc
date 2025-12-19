@@ -1,0 +1,5 @@
+---
+type: "job"
+name: "yuno-stage3"
+interface: "python"
+script: "main.py"

@@ -1,0 +1,28 @@
+---
+componentName: yuno
+
+strings:
+    productName:         "Yuno OS"
+    shortProductName:    "Yuno"
+    version:             "1.0"
+    shortVersion:        "1.0"
+    versionedName:       "Yuno OS 1.0"
+    shortVersionedName:  "Yuno 1.0"
+    bootloaderEntryName: "Yuno OS"
+    productUrl:          "https://github.com/yuno-os/yuno-os"
+    supportUrl:          "https://wiki.gentoo.org"
+    knownIssuesUrl:      "https://github.com/yuno-os/yuno-os/issues"
+    releaseNotesUrl:     "https://github.com/yuno-os/yuno-os/releases"
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+
+style:
+    sidebarBackground:   "#292F34"
+    sidebarText:         "#FFFFFF"
+    sidebarTextSelect:   "#7D56F4"
+    sidebarTextHighlight: "#7D56F4"
