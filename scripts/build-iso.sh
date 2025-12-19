@@ -184,7 +184,9 @@ EOF
         sys-apps/dbus \
         app-editors/nano \
         dev-vcs/git \
-        app-eselect/eselect-repository
+        app-eselect/eselect-repository \
+        app-admin/metalog \
+        app-misc/fastfetch
 
     # Install our TUI installer
     # (This would copy the compiled Go binary)

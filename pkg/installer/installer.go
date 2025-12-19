@@ -3,6 +3,7 @@ package installer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/japaneseenrichmentorganization/yuno_os/pkg/binpkg"
 	"github.com/japaneseenrichmentorganization/yuno_os/pkg/bootloader"
@@ -36,6 +37,7 @@ const (
 	StepPortageConfig
 	StepPortageSync
 	StepOverlays
+	StepBasePackages
 	StepKernel
 	StepGraphics
 	StepDesktop
@@ -54,6 +56,7 @@ func (s Step) String() string {
 		"Configuring Portage",
 		"Syncing Portage tree",
 		"Adding overlays",
+		"Installing base packages",
 		"Installing kernel",
 		"Configuring graphics",
 		"Installing desktop",
@@ -121,6 +124,7 @@ func (i *Installer) Install() error {
 		i.configurePortage,
 		i.syncPortage,
 		i.setupOverlays,
+		i.installBasePackages,
 		i.installKernel,
 		i.installGraphics,
 		i.installDesktop,
@@ -574,7 +578,7 @@ func (i *Installer) generateFstab() error {
 
 // enableServices enables essential system services.
 func (i *Installer) enableServices() error {
-	services := []string{"sshd"}
+	services := []string{"sshd", "metalog"}
 
 	// Add init-specific services
 	if i.config.InitSystem == config.InitSystemd {
@@ -589,6 +593,19 @@ func (i *Installer) enableServices() error {
 		} else {
 			utils.RunInChroot(i.targetDir, "rc-update", "add", svc, "default")
 		}
+	}
+
+	return nil
+}
+
+// installBasePackages installs essential base packages including metalog.
+func (i *Installer) installBasePackages() error {
+	i.progress(10, "Installing metalog (logging daemon)")
+
+	// Install metalog - simple logger with built-in rotation
+	result := utils.RunInChroot(i.targetDir, "emerge", "--ask=n", "--quiet-build", "app-admin/metalog")
+	if result.Error != nil {
+		return utils.NewError("installer", "failed to install metalog", result.Error)
 	}
 
 	return nil
