@@ -227,6 +227,31 @@ Terminal=false
 Type=Application
 Categories=System;
 EOF
+
+    # Install Yuno OS branding assets
+    log "Installing Yuno OS branding..."
+
+    mkdir -p "$rootfs/usr/share/yuno-os/avatars"
+    mkdir -p "$rootfs/usr/share/yuno-os/wallpapers"
+    mkdir -p "$rootfs/usr/share/fastfetch/presets"
+    mkdir -p "$rootfs/etc/skel/.config/fastfetch"
+
+    # Copy branding assets
+    cp "$PROJECT_DIR/branding/avatars/default-avatar.jpg" "$rootfs/usr/share/yuno-os/avatars/"
+    cp "$PROJECT_DIR/branding/wallpapers/yuno-wallpaper.jpg" "$rootfs/usr/share/yuno-os/wallpapers/"
+    cp "$PROJECT_DIR/branding/fastfetch/yuno.txt" "$rootfs/usr/share/yuno-os/"
+    cp "$PROJECT_DIR/branding/fastfetch/config.jsonc" "$rootfs/usr/share/fastfetch/presets/yuno.jsonc"
+
+    # Set up default fastfetch config for new users
+    cp "$PROJECT_DIR/branding/fastfetch/config.jsonc" "$rootfs/etc/skel/.config/fastfetch/config.jsonc"
+
+    # Copy wallpaper to backgrounds
+    mkdir -p "$rootfs/usr/share/backgrounds/yuno"
+    cp "$PROJECT_DIR/branding/wallpapers/yuno-wallpaper.jpg" "$rootfs/usr/share/backgrounds/yuno/"
+
+    # Set default avatar for live user
+    cp "$PROJECT_DIR/branding/avatars/default-avatar.jpg" "$rootfs/etc/skel/.face"
+    cp "$PROJECT_DIR/branding/avatars/default-avatar.jpg" "$rootfs/etc/skel/.face.icon"
 }
 
 configure_live_system() {

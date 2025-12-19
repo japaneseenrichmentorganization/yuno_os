@@ -262,6 +262,20 @@ export PATH="$HOME/.local/bin:$PATH"
 		return utils.NewError("users", "failed to write .bash_profile", err)
 	}
 
+	// Copy default avatar to user's face icon location
+	avatarSrc := "/usr/share/yuno-os/avatars/default-avatar.jpg"
+	if utils.FileExists(avatarSrc) {
+		facePath := filepath.Join(skelDir, ".face")
+		if err := utils.CopyFile(avatarSrc, facePath); err != nil {
+			utils.Warn("Failed to copy default avatar: %v", err)
+		}
+		// Also copy to .face.icon for compatibility
+		faceIconPath := filepath.Join(skelDir, ".face.icon")
+		if err := utils.CopyFile(avatarSrc, faceIconPath); err != nil {
+			utils.Warn("Failed to copy default avatar icon: %v", err)
+		}
+	}
+
 	return nil
 }
 
