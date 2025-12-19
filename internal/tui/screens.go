@@ -152,6 +152,101 @@ func (a *App) viewInitSystem() string {
 	return fmt.Sprintf("%s\n%s\n\n%s", title, subtitle, optionList.String())
 }
 
+// viewProfile renders the Gentoo profile selection screen
+func (a *App) viewProfile() string {
+	title := titleStyle.Render("Gentoo Profile")
+	subtitle := subtitleStyle.Render("Select a Gentoo profile (determines default USE flags and settings)")
+
+	// Filter profiles by selected init system
+	profiles := config.GetProfilesForInitSystem(a.config.InitSystem)
+
+	// Category filter buttons
+	categories := []struct {
+		cat  config.ProfileCategory
+		name string
+	}{
+		{config.ProfileCategoryDesktop, "Desktop"},
+		{config.ProfileCategoryHardened, "Hardened"},
+		{config.ProfileCategoryMinimal, "Minimal"},
+		{config.ProfileCategoryMusl, "Musl"},
+	}
+
+	var filterBar strings.Builder
+	filterBar.WriteString("Filter: ")
+	for _, cat := range categories {
+		style := normalStyle
+		if a.profileFilter == cat.cat {
+			style = selectedStyle
+		}
+		filterBar.WriteString(style.Render(fmt.Sprintf("[%s] ", cat.name)))
+	}
+
+	// Filter profiles by category if set
+	if a.profileFilter != "" {
+		var filtered []config.GentooProfile
+		for _, p := range profiles {
+			if p.Category == a.profileFilter {
+				filtered = append(filtered, p)
+			}
+		}
+		if len(filtered) > 0 {
+			profiles = filtered
+		}
+	}
+
+	// Store filtered profiles for navigation
+	a.profiles = profiles
+
+	var profileList strings.Builder
+	for i, p := range profiles {
+		cursor := "  "
+		style := normalStyle
+		if i == a.selectedProfile {
+			cursor = "▸ "
+			style = selectedStyle
+		}
+
+		// Add category indicator
+		catIcon := ""
+		switch p.Category {
+		case config.ProfileCategoryDesktop:
+			catIcon = "🖥️ "
+		case config.ProfileCategoryHardened:
+			catIcon = "🛡️ "
+		case config.ProfileCategoryMinimal:
+			catIcon = "📦 "
+		case config.ProfileCategoryMusl:
+			catIcon = "🔧 "
+		case config.ProfileCategorySelinux:
+			catIcon = "🔒 "
+		}
+
+		stableMarker := ""
+		if !p.Stable {
+			stableMarker = " (unstable)"
+		}
+
+		profileList.WriteString(style.Render(fmt.Sprintf("%s%s%s%s\n", cursor, catIcon, p.Name, stableMarker)))
+		if i == a.selectedProfile {
+			// Show description for selected profile
+			profileList.WriteString(subtitleStyle.Render(fmt.Sprintf("    %s\n", p.Description)))
+			profileList.WriteString(helpStyle.Render(fmt.Sprintf("    Path: %s\n", p.Path)))
+		}
+	}
+
+	// Info box for hardened profiles
+	infoBox := ""
+	if a.selectedProfile < len(profiles) && profiles[a.selectedProfile].Category == config.ProfileCategoryHardened {
+		infoBox = boxStyle.Render(`⚠️  Hardened Profile Notes:
+• Includes PaX/grsecurity-like security features
+• May require kernel configuration changes
+• Some packages may need adjustment
+• Recommended for security-focused systems`)
+	}
+
+	return fmt.Sprintf("%s\n%s\n\n%s\n\n%s\n%s", title, subtitle, filterBar.String(), profileList.String(), infoBox)
+}
+
 // viewOverlays renders the overlay selection screen
 func (a *App) viewOverlays() string {
 	title := titleStyle.Render("Portage Overlays")

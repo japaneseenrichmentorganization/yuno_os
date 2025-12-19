@@ -19,6 +19,7 @@ const (
 	ScreenPartition
 	ScreenEncryption
 	ScreenInitSystem
+	ScreenProfile
 	ScreenOverlays
 	ScreenCFlags
 	ScreenUseFlags
@@ -46,6 +47,11 @@ type App struct {
 	// Screen-specific state
 	diskList     []DiskItem
 	selectedDisk int
+
+	// Profile selection state
+	profiles        []config.GentooProfile
+	selectedProfile int
+	profileFilter   config.ProfileCategory
 
 	// Navigation
 	focusIndex   int
@@ -200,6 +206,16 @@ func (a *App) saveScreenToConfig() {
 		if a.selectedDisk < len(a.diskList) {
 			a.config.Disk.Device = a.diskList[a.selectedDisk].Path
 		}
+	case ScreenInitSystem:
+		if a.focusIndex == 0 {
+			a.config.InitSystem = config.InitOpenRC
+		} else {
+			a.config.InitSystem = config.InitSystemd
+		}
+	case ScreenProfile:
+		if a.selectedProfile < len(a.profiles) {
+			a.config.Portage.Profile = a.profiles[a.selectedProfile].Path
+		}
 	}
 }
 
@@ -219,6 +235,8 @@ func (a *App) View() string {
 		content = a.viewEncryption()
 	case ScreenInitSystem:
 		content = a.viewInitSystem()
+	case ScreenProfile:
+		content = a.viewProfile()
 	case ScreenOverlays:
 		content = a.viewOverlays()
 	case ScreenCFlags:
@@ -280,7 +298,7 @@ func (a *App) applyLayout(content string) string {
 // renderProgress renders the installation progress bar
 func (a *App) renderProgress() string {
 	steps := []string{
-		"Disk", "Encrypt", "Init", "Overlays", "Flags",
+		"Disk", "Encrypt", "Init", "Profile", "Overlays", "Flags",
 		"Kernel", "Graphics", "Desktop", "Users", "Install",
 	}
 

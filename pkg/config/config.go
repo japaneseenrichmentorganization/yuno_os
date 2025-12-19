@@ -147,6 +147,266 @@ const (
 	CFlagsCustom     CFlagsPreset = "custom"     // User-defined
 )
 
+// GentooProfile represents a Gentoo profile with metadata.
+type GentooProfile struct {
+	Path        string      // Full profile path (e.g., "default/linux/amd64/23.0/desktop")
+	Name        string      // Human-readable name
+	Description string      // Description
+	InitSystem  InitSystem  // Required init system (empty = both supported)
+	Category    ProfileCategory
+	Stable      bool        // Whether this is a stable profile
+}
+
+// ProfileCategory categorizes profiles.
+type ProfileCategory string
+
+const (
+	ProfileCategoryDesktop  ProfileCategory = "desktop"
+	ProfileCategoryServer   ProfileCategory = "server"
+	ProfileCategoryHardened ProfileCategory = "hardened"
+	ProfileCategoryMinimal  ProfileCategory = "minimal"
+	ProfileCategoryDeveloper ProfileCategory = "developer"
+	ProfileCategorySystemd  ProfileCategory = "systemd"
+	ProfileCategoryMusl     ProfileCategory = "musl"
+	ProfileCategorySelinux  ProfileCategory = "selinux"
+)
+
+// AvailableProfiles returns all available Gentoo profiles for amd64.
+func AvailableProfiles() []GentooProfile {
+	return []GentooProfile{
+		// Standard Desktop Profiles (OpenRC)
+		{
+			Path:        "default/linux/amd64/23.0/desktop",
+			Name:        "Desktop (OpenRC)",
+			Description: "Standard desktop profile with OpenRC init",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/desktop/gnome",
+			Name:        "Desktop GNOME (OpenRC)",
+			Description: "Desktop profile optimized for GNOME",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/desktop/plasma",
+			Name:        "Desktop KDE Plasma (OpenRC)",
+			Description: "Desktop profile optimized for KDE Plasma",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		// Standard Desktop Profiles (systemd)
+		{
+			Path:        "default/linux/amd64/23.0/desktop/systemd",
+			Name:        "Desktop (systemd)",
+			Description: "Standard desktop profile with systemd init",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/desktop/gnome/systemd",
+			Name:        "Desktop GNOME (systemd)",
+			Description: "Desktop profile optimized for GNOME with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/desktop/plasma/systemd",
+			Name:        "Desktop KDE Plasma (systemd)",
+			Description: "Desktop profile optimized for KDE Plasma with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		// Minimal/Server Profiles
+		{
+			Path:        "default/linux/amd64/23.0",
+			Name:        "Default (OpenRC)",
+			Description: "Base profile without desktop USE flags",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMinimal,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/systemd",
+			Name:        "Default (systemd)",
+			Description: "Base profile without desktop USE flags, with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategorySystemd,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/no-multilib",
+			Name:        "No Multilib (OpenRC)",
+			Description: "64-bit only, no 32-bit library support",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMinimal,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/no-multilib/systemd",
+			Name:        "No Multilib (systemd)",
+			Description: "64-bit only, no 32-bit library support, with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategorySystemd,
+			Stable:      true,
+		},
+		// Hardened Profiles (OpenRC)
+		{
+			Path:        "default/linux/amd64/23.0/hardened",
+			Name:        "Hardened (OpenRC)",
+			Description: "Security-hardened profile with PaX/grsecurity features",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/hardened/selinux",
+			Name:        "Hardened SELinux (OpenRC)",
+			Description: "Hardened profile with SELinux mandatory access control",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/hardened/no-multilib",
+			Name:        "Hardened No Multilib (OpenRC)",
+			Description: "Hardened 64-bit only profile",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		// Hardened Profiles (systemd)
+		{
+			Path:        "default/linux/amd64/23.0/hardened/systemd",
+			Name:        "Hardened (systemd)",
+			Description: "Security-hardened profile with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/hardened/selinux/systemd",
+			Name:        "Hardened SELinux (systemd)",
+			Description: "Hardened profile with SELinux and systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/hardened/no-multilib/systemd",
+			Name:        "Hardened No Multilib (systemd)",
+			Description: "Hardened 64-bit only profile with systemd",
+			InitSystem:  InitSystemd,
+			Category:    ProfileCategoryHardened,
+			Stable:      true,
+		},
+		// Musl Profiles
+		{
+			Path:        "default/linux/amd64/23.0/musl",
+			Name:        "Musl libc",
+			Description: "Profile using musl instead of glibc",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMusl,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/musl/hardened",
+			Name:        "Musl Hardened",
+			Description: "Hardened profile with musl libc",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMusl,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/musl/hardened/selinux",
+			Name:        "Musl Hardened SELinux",
+			Description: "Hardened musl profile with SELinux",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMusl,
+			Stable:      true,
+		},
+		// Split-usr profiles
+		{
+			Path:        "default/linux/amd64/23.0/split-usr",
+			Name:        "Split /usr (OpenRC)",
+			Description: "Traditional split /usr layout",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMinimal,
+			Stable:      true,
+		},
+		{
+			Path:        "default/linux/amd64/23.0/split-usr/desktop",
+			Name:        "Split /usr Desktop (OpenRC)",
+			Description: "Split /usr with desktop USE flags",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryDesktop,
+			Stable:      true,
+		},
+		// Developer profile
+		{
+			Path:        "default/linux/amd64/23.0/desktop",
+			Name:        "Developer Desktop",
+			Description: "Desktop profile suitable for development",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryDeveloper,
+			Stable:      true,
+		},
+		// x32 ABI profile
+		{
+			Path:        "default/linux/amd64/23.0/x32",
+			Name:        "x32 ABI",
+			Description: "x32 ABI profile (32-bit pointers on 64-bit)",
+			InitSystem:  InitOpenRC,
+			Category:    ProfileCategoryMinimal,
+			Stable:      false,
+		},
+	}
+}
+
+// GetProfilesForInitSystem returns profiles compatible with the given init system.
+func GetProfilesForInitSystem(init InitSystem) []GentooProfile {
+	var result []GentooProfile
+	for _, p := range AvailableProfiles() {
+		if p.InitSystem == init || p.InitSystem == "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// GetProfilesByCategory returns profiles in the given category.
+func GetProfilesByCategory(category ProfileCategory) []GentooProfile {
+	var result []GentooProfile
+	for _, p := range AvailableProfiles() {
+		if p.Category == category {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// GetHardenedProfiles returns all hardened profiles.
+func GetHardenedProfiles() []GentooProfile {
+	return GetProfilesByCategory(ProfileCategoryHardened)
+}
+
+// FindProfileByPath finds a profile by its path.
+func FindProfileByPath(path string) *GentooProfile {
+	for _, p := range AvailableProfiles() {
+		if p.Path == path {
+			return &p
+		}
+	}
+	return nil
+}
+
 // GetCFlags returns the actual CFLAGS string for a preset.
 func (p CFlagsPreset) GetCFlags() string {
 	switch p {
