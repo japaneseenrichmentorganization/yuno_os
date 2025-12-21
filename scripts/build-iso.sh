@@ -48,11 +48,11 @@ if [[ -f /etc/gentoo-release ]]; then
 fi
 
 log() {
-    echo -e "${GREEN}[INFO]${NC} $*"
+    echo -e "${GREEN}[INFO]${NC} $*" >&2
 }
 
 warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
+    echo -e "${YELLOW}[WARN]${NC} $*" >&2
 }
 
 error() {
@@ -61,9 +61,9 @@ error() {
 }
 
 header() {
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${MAGENTA}  $*${NC}"
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
+    echo -e "${MAGENTA}  $*${NC}" >&2
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
 }
 
 check_root() {
