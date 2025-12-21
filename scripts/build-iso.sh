@@ -442,36 +442,116 @@ EOF
         run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop"
     fi
 
+    # Handle GCC upgrade for testing branch
+    # When using ~amd64, we likely have a newer GCC available that needs to be
+    # installed and set as the default compiler before building other packages
+    if [[ "$USE_TESTING" == "true" ]]; then
+        header "Upgrading GCC for testing branch"
+        log "Testing branch (~amd64) detected - checking for newer GCC..."
+
+        # First, update portage itself
+        log "Updating portage..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-apps/portage" || true
+
+        # Install the newest GCC available
+        log "Installing latest GCC from testing branch..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/gcc"
+
+        # Get the list of installed GCC versions and select the newest
+        log "Switching to the newest GCC version..."
+        run_in_chroot "$rootfs" "
+            # List available GCC versions
+            gcc-config -l
+
+            # Get the newest version (last in the list)
+            NEWEST_GCC=\$(gcc-config -l | tail -1 | awk '{print \$2}' | tr -d '[]')
+
+            # If we got a valid profile, switch to it
+            if [[ -n \"\$NEWEST_GCC\" ]]; then
+                echo \"Switching to GCC profile: \$NEWEST_GCC\"
+                gcc-config \"\$NEWEST_GCC\"
+            fi
+        "
+
+        # Source the updated environment to use the new GCC
+        log "Updating environment for new GCC..."
+        run_in_chroot "$rootfs" "env-update && source /etc/profile"
+
+        # Verify GCC version
+        log "New GCC version:"
+        run_in_chroot "$rootfs" "gcc --version | head -1"
+
+        # Rebuild libtool to fix .la files with new GCC
+        log "Rebuilding libtool for new GCC..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/libtool" || true
+    fi
+
     # Stage 1 build: rebuild the entire toolchain with our optimization flags
     if [[ "$STAGE1_BUILD" == "true" ]]; then
         header "Stage 1: Rebuilding toolchain"
         warn "This will take a VERY long time (several hours)..."
 
-        # Rebuild binutils
-        log "Rebuilding binutils..."
+        # If we're also on testing, GCC was already upgraded above
+        # Now we rebuild the full toolchain with our optimization flags
+
+        # Rebuild binutils with our flags
+        log "Rebuilding binutils with optimization flags..."
         run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/binutils"
 
-        # Rebuild GCC
-        log "Rebuilding GCC..."
+        # Rebuild GCC with our optimization flags
+        log "Rebuilding GCC with optimization flags..."
         run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/gcc"
 
-        # Switch to the new GCC if multiple versions
-        run_in_chroot "$rootfs" "gcc-config \$(gcc-config -l | tail -1 | cut -d'[' -f2 | cut -d']' -f1)" || true
-        run_in_chroot "$rootfs" "source /etc/profile"
+        # Switch to the newly built GCC (it will have the same version but rebuilt with our flags)
+        log "Switching to rebuilt GCC..."
+        run_in_chroot "$rootfs" "
+            # Get the current/newest GCC profile
+            CURRENT_GCC=\$(gcc-config -c)
+            echo \"Current GCC profile: \$CURRENT_GCC\"
 
-        # Rebuild glibc
-        log "Rebuilding glibc..."
+            # Get all profiles for this version
+            gcc-config -l
+
+            # Select the newest profile (in case a new slot was created)
+            NEWEST_GCC=\$(gcc-config -l | tail -1 | awk '{print \$2}' | tr -d '[]')
+            if [[ -n \"\$NEWEST_GCC\" && \"\$NEWEST_GCC\" != \"\$CURRENT_GCC\" ]]; then
+                echo \"Switching to: \$NEWEST_GCC\"
+                gcc-config \"\$NEWEST_GCC\"
+            fi
+        "
+
+        # Update environment
+        run_in_chroot "$rootfs" "env-update && source /etc/profile"
+
+        # Verify the compiler is working
+        log "Verifying GCC after rebuild..."
+        run_in_chroot "$rootfs" "gcc --version | head -1"
+        run_in_chroot "$rootfs" "echo 'int main(){}' | gcc -x c - -o /tmp/test && rm /tmp/test && echo 'GCC working!'"
+
+        # Rebuild glibc with the new compiler
+        log "Rebuilding glibc with optimized toolchain..."
         run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-libs/glibc"
 
         # Rebuild libtool to fix any .la files
         log "Rebuilding libtool..."
         run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/libtool"
 
+        # Fix any library inconsistencies
+        log "Fixing library dependencies..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/binutils" || true
+
         # Now rebuild the entire system with the new toolchain
-        log "Rebuilding @world with new toolchain..."
-        run_in_chroot "$rootfs" "emerge --ask=n --emptytree --deep @world" || {
-            warn "Full @world rebuild had some failures, continuing..."
+        log "Rebuilding @world with optimized toolchain..."
+        log "This is the longest step - rebuilding all packages with the new compiler..."
+        run_in_chroot "$rootfs" "emerge --ask=n --emptytree --deep --with-bdeps=y @world" || {
+            warn "Full @world rebuild had some failures, attempting to continue..."
+            # Try to fix broken packages
+            run_in_chroot "$rootfs" "emerge --ask=n --resume --skipfirst" || true
         }
+
+        # Clean up old GCC versions
+        log "Cleaning up old compiler versions..."
+        run_in_chroot "$rootfs" "emerge --ask=n --depclean sys-devel/gcc" || true
 
         log "Stage 1 toolchain rebuild complete!"
     else
