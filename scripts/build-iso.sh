@@ -33,6 +33,8 @@ USE_NATIVE="${USE_NATIVE:-false}"      # Use -march=native -mtune=native
 OPT_LEVEL="${OPT_LEVEL:-2}"            # Optimization level: 2 or 3
 ENABLE_LTO="${ENABLE_LTO:-false}"      # Enable LTO via GentooLTO overlay
 USE_PIPE="${USE_PIPE:-true}"           # Use -pipe (faster, uses more RAM)
+USE_TESTING="${USE_TESTING:-false}"    # Use ~amd64 (testing) instead of stable
+STAGE1_BUILD="${STAGE1_BUILD:-false}"  # Rebuild toolchain from scratch (stage1)
 
 # ISO settings
 ISO_NAME="yuno-os"
@@ -367,6 +369,15 @@ install_packages() {
         fi
     fi
 
+    # Set ACCEPT_KEYWORDS based on testing flag
+    local accept_keywords="amd64"
+    if [[ "$USE_TESTING" == "true" ]]; then
+        accept_keywords="~amd64"
+        log "Using testing branch (~amd64)"
+    else
+        log "Using stable branch (amd64)"
+    fi
+
     cat > "$rootfs/etc/portage/make.conf" << EOF
 COMMON_FLAGS="${march_flags} ${opt_flag} ${pipe_flag}"
 CFLAGS="\${COMMON_FLAGS}"
@@ -374,6 +385,7 @@ CXXFLAGS="\${COMMON_FLAGS}"
 MAKEOPTS="-j${nproc_count}"
 FEATURES="parallel-fetch candy -getbinpkg"
 ACCEPT_LICENSE="*"
+ACCEPT_KEYWORDS="${accept_keywords}"
 USE="${use_flags}"
 VIDEO_CARDS="amdgpu radeonsi intel i965 iris nvidia nouveau virgl"
 INPUT_DEVICES="libinput"
@@ -430,9 +442,43 @@ EOF
         run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop"
     fi
 
-    # Update @world first
-    log "Updating @world..."
-    run_in_chroot "$rootfs" "emerge --update --deep --newuse @world" || true
+    # Stage 1 build: rebuild the entire toolchain with our optimization flags
+    if [[ "$STAGE1_BUILD" == "true" ]]; then
+        header "Stage 1: Rebuilding toolchain"
+        warn "This will take a VERY long time (several hours)..."
+
+        # Rebuild binutils
+        log "Rebuilding binutils..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/binutils"
+
+        # Rebuild GCC
+        log "Rebuilding GCC..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/gcc"
+
+        # Switch to the new GCC if multiple versions
+        run_in_chroot "$rootfs" "gcc-config \$(gcc-config -l | tail -1 | cut -d'[' -f2 | cut -d']' -f1)" || true
+        run_in_chroot "$rootfs" "source /etc/profile"
+
+        # Rebuild glibc
+        log "Rebuilding glibc..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-libs/glibc"
+
+        # Rebuild libtool to fix any .la files
+        log "Rebuilding libtool..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/libtool"
+
+        # Now rebuild the entire system with the new toolchain
+        log "Rebuilding @world with new toolchain..."
+        run_in_chroot "$rootfs" "emerge --ask=n --emptytree --deep @world" || {
+            warn "Full @world rebuild had some failures, continuing..."
+        }
+
+        log "Stage 1 toolchain rebuild complete!"
+    else
+        # Normal update
+        log "Updating @world..."
+        run_in_chroot "$rootfs" "emerge --update --deep --newuse @world" || true
+    fi
 
     # Install essential packages for live environment
     log "Installing essential packages..."
@@ -892,17 +938,20 @@ show_usage() {
     echo "  --native            Use -march=native -mtune=native (CPU-specific optimizations)"
     echo "  --o3                Use -O3 optimization (default: -O2)"
     echo "  --lto               Enable LTO (Link Time Optimization) via GentooLTO overlay"
+    echo "  --testing           Use ~amd64 testing branch (default: stable amd64)"
+    echo "  --stage1            Rebuild toolchain from scratch (VERY slow, maximum optimization)"
     echo "  --no-pipe           Disable -pipe flag (use if low on RAM)"
     echo "  --clean             Clean build directories before starting"
     echo "  --no-cache          Don't use cached stage3 tarballs"
     echo "  --help              Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                                    # Build with defaults (OpenRC, -O2, generic)"
+    echo "  $0                                    # Build with defaults (OpenRC, -O2, stable)"
     echo "  $0 --init-system systemd              # Build with systemd"
     echo "  $0 --native --o3                      # Native CPU opts with -O3"
     echo "  $0 --native --o3 --lto                # Full optimization with LTO"
-    echo "  $0 --init-system systemd --native     # systemd with native optimizations"
+    echo "  $0 --testing                          # Use ~amd64 testing packages"
+    echo "  $0 --native --o3 --lto --stage1       # Maximum optimization (takes hours!)"
     echo ""
     echo "Environment Variables:"
     echo "  BUILD_DIR       Build directory (default: /var/tmp/yuno-build)"
@@ -914,6 +963,8 @@ show_usage() {
     echo "  OPT_LEVEL       Optimization level: 2 or 3 (default: 2)"
     echo "  ENABLE_LTO      Enable LTO: true or false (default: false)"
     echo "  USE_PIPE        Use -pipe flag: true or false (default: true)"
+    echo "  USE_TESTING     Use ~amd64 testing: true or false (default: false)"
+    echo "  STAGE1_BUILD    Rebuild toolchain: true or false (default: false)"
     echo ""
     echo "This script can be run from any Linux distribution."
     echo "If not running on Gentoo, a build environment will be bootstrapped automatically."
@@ -945,6 +996,14 @@ main() {
                 ENABLE_LTO=true
                 shift
                 ;;
+            --testing)
+                USE_TESTING=true
+                shift
+                ;;
+            --stage1)
+                STAGE1_BUILD=true
+                shift
+                ;;
             --no-pipe)
                 USE_PIPE=false
                 shift
@@ -971,7 +1030,9 @@ main() {
 
     log "Init system: ${INIT_SYSTEM}"
     log "Compiler flags: march=$([ "$USE_NATIVE" == "true" ] && echo "native" || echo "x86-64") -O${OPT_LEVEL} $([ "$USE_PIPE" == "true" ] && echo "-pipe" || echo "")"
+    log "Package branch: $([ "$USE_TESTING" == "true" ] && echo "~amd64 (testing)" || echo "amd64 (stable)")"
     [[ "$ENABLE_LTO" == "true" ]] && log "LTO: enabled"
+    [[ "$STAGE1_BUILD" == "true" ]] && warn "Stage1 build: enabled (this will take a LONG time!)"
     if [[ "$IS_GENTOO" == "true" ]]; then
         log "Running on Gentoo Linux"
     else
