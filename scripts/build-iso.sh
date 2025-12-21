@@ -119,7 +119,7 @@ fetch_stage3() {
     local latest_url="$GENTOO_MIRROR/releases/$ARCH/autobuilds/latest-stage3-$ARCH-$variant.txt"
     local latest_file
 
-    latest_file=$(wget -qO- "$latest_url" | grep -v "^#" | head -1 | awk '{print $1}')
+    latest_file=$(wget -qO- "$latest_url" | grep "\.tar\.xz" | head -1 | awk '{print $1}')
 
     if [[ -z "$latest_file" ]]; then
         error "Could not determine latest stage3"
