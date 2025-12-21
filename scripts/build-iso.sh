@@ -226,11 +226,13 @@ setup_gentoo_buildenv() {
     setup_buildenv_chroot "$BUILD_ENV_DIR"
 
     # Configure make.conf for the build environment
-    cat > "$BUILD_ENV_DIR/etc/portage/make.conf" << 'EOF'
+    local nproc_count
+    nproc_count=$(nproc)
+    cat > "$BUILD_ENV_DIR/etc/portage/make.conf" << EOF
 COMMON_FLAGS="-march=x86-64 -O2 -pipe"
-CFLAGS="${COMMON_FLAGS}"
-CXXFLAGS="${COMMON_FLAGS}"
-MAKEOPTS="-j$(nproc)"
+CFLAGS="\${COMMON_FLAGS}"
+CXXFLAGS="\${COMMON_FLAGS}"
+MAKEOPTS="-j${nproc_count}"
 FEATURES="parallel-fetch -sandbox -usersandbox"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64 pc"
@@ -245,7 +247,7 @@ EOF
     run_in_chroot "$BUILD_ENV_DIR" "emerge --ask=n --quiet-build \
         sys-fs/squashfs-tools \
         sys-boot/grub \
-        app-cdr/xorriso \
+        dev-libs/libisoburn \
         sys-fs/mtools \
         sys-fs/dosfstools \
         dev-lang/go"
@@ -274,11 +276,13 @@ install_packages() {
     header "Installing packages in ISO rootfs"
 
     # Configure make.conf for ISO build
-    cat > "$rootfs/etc/portage/make.conf" << 'EOF'
+    local nproc_count
+    nproc_count=$(nproc)
+    cat > "$rootfs/etc/portage/make.conf" << EOF
 COMMON_FLAGS="-march=x86-64 -O2 -pipe"
-CFLAGS="${COMMON_FLAGS}"
-CXXFLAGS="${COMMON_FLAGS}"
-MAKEOPTS="-j$(nproc)"
+CFLAGS="\${COMMON_FLAGS}"
+CXXFLAGS="\${COMMON_FLAGS}"
+MAKEOPTS="-j${nproc_count}"
 FEATURES="parallel-fetch candy getbinpkg"
 ACCEPT_LICENSE="*"
 USE="X wayland pulseaudio pipewire networkmanager bluetooth -systemd"
