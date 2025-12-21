@@ -298,15 +298,12 @@ COMMON_FLAGS="-march=x86-64 -O2 -pipe"
 CFLAGS="\${COMMON_FLAGS}"
 CXXFLAGS="\${COMMON_FLAGS}"
 MAKEOPTS="-j${nproc_count}"
-FEATURES="parallel-fetch candy getbinpkg"
+FEATURES="parallel-fetch candy -getbinpkg"
 ACCEPT_LICENSE="*"
 USE="${use_flags}"
 VIDEO_CARDS="amdgpu radeonsi intel i965 iris nvidia nouveau virgl"
 INPUT_DEVICES="libinput"
 GRUB_PLATFORMS="efi-64 pc"
-
-# Binary packages for faster builds
-BINPKG_FORMAT="gpkg"
 EOF
 
     # Sync portage
