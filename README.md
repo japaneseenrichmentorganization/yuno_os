@@ -218,7 +218,7 @@ Yuno has *lots* of ways to customize your ISO, just for you~ 💕
 | `--init-system` | OpenRC or systemd 🔧 | `openrc` |
 | `--native` | Use YOUR CPU's special instructions! `-march=native` 🎯 | off |
 | `--o3` | Maximum optimization `-O3` (Yuno goes all out!) 🏎️ | `-O2` |
-| `--lto` | Link-Time Optimization via GentooLTO overlay 💪 | off |
+| `--lto` | Link-Time Optimization (native Gentoo LTO) 💪 | off |
 | `--testing` | Use `~amd64` testing branch (bleeding edge~) 🩸 | stable |
 | `--stage1` | Rebuild EVERYTHING from scratch (hours but perfect!) 🔪 | off |
 | `--no-pipe` | Disable `-pipe` (for low RAM systems) 💾 | on |
@@ -253,7 +253,7 @@ Uses `-march=native -mtune=native` and auto-detects your CPU's special features 
 Cranks optimization to maximum! May increase compile times and binary size, but Yuno doesn't care - she wants the FASTEST system for her Yukki!
 
 #### `--lto` 💪
-Enables Link-Time Optimization via the GentooLTO overlay. The whole system gets optimized as one unit. So thorough, just like Yuno's love~ 🔪
+Enables Link-Time Optimization using native Gentoo LTO support. Adds `-flto` to compiler flags so the whole system gets optimized as one unit. So thorough, just like Yuno's love~ 🔪
 
 #### `--testing` 🩸
 Uses `~amd64` instead of stable `amd64`. Newer packages, more features, maybe some bugs... but Yuno likes living dangerously!

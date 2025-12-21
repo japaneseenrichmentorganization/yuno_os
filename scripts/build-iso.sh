@@ -378,10 +378,21 @@ install_packages() {
         log "Using stable branch (amd64)"
     fi
 
+    # Build LTO flags if enabled
+    local lto_flags=""
+    local lto_ldflags=""
+    if [[ "$ENABLE_LTO" == "true" ]]; then
+        # Use thin LTO for faster compile times, or full LTO for maximum optimization
+        lto_flags="-flto"
+        lto_ldflags="-flto -Wl,-O1 -Wl,--as-needed"
+        log "LTO (Link Time Optimization) enabled via native Gentoo support"
+    fi
+
     cat > "$rootfs/etc/portage/make.conf" << EOF
-COMMON_FLAGS="${march_flags} ${opt_flag} ${pipe_flag}"
+COMMON_FLAGS="${march_flags} ${opt_flag} ${pipe_flag} ${lto_flags}"
 CFLAGS="\${COMMON_FLAGS}"
 CXXFLAGS="\${COMMON_FLAGS}"
+LDFLAGS="${lto_ldflags}"
 MAKEOPTS="-j${nproc_count}"
 FEATURES="parallel-fetch candy -getbinpkg"
 ACCEPT_LICENSE="*"
@@ -401,15 +412,6 @@ CPU_FLAGS_X86="${cpu_flags}"
 EOF
     fi
 
-    # Add LTO-specific configuration if enabled
-    if [[ "$ENABLE_LTO" == "true" ]]; then
-        cat >> "$rootfs/etc/portage/make.conf" << 'EOF'
-
-# LTO Configuration
-LDFLAGS="${LDFLAGS} -fuse-linker-plugin"
-EOF
-    fi
-
     # Sync portage
     log "Syncing Portage tree..."
     run_in_chroot "$rootfs" "emerge-webrsync"
@@ -426,13 +428,8 @@ EOF
         fi
     fi
 
-    # Setup GentooLTO overlay if LTO is enabled
-    if [[ "$ENABLE_LTO" == "true" ]]; then
-        log "Setting up GentooLTO overlay..."
-        run_in_chroot "$rootfs" "emerge --ask=n app-eselect/eselect-repository"
-        run_in_chroot "$rootfs" "eselect repository enable lto-overlay"
-        run_in_chroot "$rootfs" "emerge --sync lto-overlay"
-    fi
+    # Note: LTO is now natively supported in Gentoo without external overlays
+    # The LTO flags are configured directly in make.conf above
 
     # Select profile based on init system
     log "Selecting desktop profile (${INIT_SYSTEM})..."
