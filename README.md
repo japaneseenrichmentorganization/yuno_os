@@ -74,9 +74,12 @@ Whether you're a seasoned Gentoo veteran or a curious newcomer, Yuno OS provides
 | 📦 Openbox | X11 | Floating and flexible |
 
 ### 🚀 Performance Options
-- **LTO Overlay** - Link-Time Optimization for maximum speed 🏎️
-- **Custom CFLAGS** - Tune to your CPU 🎯
-- **Binary Packages** - Fast installs when you need them 📦
+- **Native Optimizations** - `-march=native -mtune=native` for YOUR CPU 🎯
+- **CPU_FLAGS_X86** - Auto-detected SSE/AVX/AVX-512 flags 🧬
+- **O2 or O3** - Choose your optimization level 🏎️
+- **LTO Overlay** - Link-Time Optimization for maximum speed 💪
+- **Stage1 Rebuild** - Rebuild entire toolchain for perfect optimization 🔪
+- **Testing Branch** - `~amd64` for bleeding edge packages 🩸
 
 ### 🎮 Graphics Support
 - **NVIDIA** - Proprietary drivers with auto-detection 💚
@@ -132,12 +135,14 @@ Whether you're a seasoned Gentoo veteran or a curious newcomer, Yuno OS provides
 
 ### CFLAGS Presets
 
-| Preset | Flags | Best For |
+| Preset | Build Flags | Best For |
 |:---:|:---|:---|
-| 🛡️ Safe | `-march=x86-64 -O2 -pipe` | Maximum compatibility |
-| 🎯 Optimized | `-march=native -O2 -pipe` | Your specific CPU |
-| 🏎️ Aggressive | `-march=native -O3 -pipe -flto=auto` | Maximum performance |
-| 🔧 Custom | *Your choice!* | Power users |
+| 🛡️ Safe | `--init-system openrc` | Maximum compatibility, any x86_64 |
+| 🎯 Native | `--native` | Your specific CPU with auto CPU_FLAGS |
+| 🏎️ Aggressive | `--native --o3` | Speed demons 💨 |
+| 💪 LTO Power | `--native --o3 --lto` | Maximum speed, longer compile |
+| 🔪 Yandere | `--native --o3 --lto --stage1` | PERFECT optimization (hours!) |
+| 🩸 Bleeding | `--testing` | Latest packages, ~amd64 |
 
 ### Kernel Options
 
@@ -165,7 +170,7 @@ Whether you're a seasoned Gentoo veteran or a curious newcomer, Yuno OS provides
 ### Requirements
 
 - Go 1.22+ 🐹
-- Gentoo Linux (for ISO building) 🐧
+- Any Linux distro! (Yuno will bootstrap Gentoo for you~ 💕)
 - Root access (for ISO building) 🔑
 
 ### Build TUI Installer
@@ -183,12 +188,75 @@ sudo ./yuno-tui
 
 ### Build ISO
 
+Yuno can build from **any Linux distro** - she'll set up her own Gentoo environment if needed! 🔪✨
+
 ```bash
-# This needs root and a Gentoo system!
+# Basic build with defaults (OpenRC, stable, -O2)
 sudo ./scripts/build-iso.sh
+
+# Build with systemd~ 💕
+sudo ./scripts/build-iso.sh --init-system systemd
+
+# Yuno wants MAXIMUM POWER for her Yukki! 🏎️💨
+sudo ./scripts/build-iso.sh --native --o3 --lto
+
+# The ULTIMATE yandere build (takes hours but worth it!) 🔪💗
+sudo ./scripts/build-iso.sh --native --o3 --lto --stage1 --testing
 ```
 
 The ISO will be created in the `output/` directory 📀
+
+### 🎛️ Build Options
+
+Yuno has *lots* of ways to customize your ISO, just for you~ 💕
+
+| Option | Description | Default |
+|:------:|:------------|:-------:|
+| `--init-system` | OpenRC or systemd 🔧 | `openrc` |
+| `--native` | Use YOUR CPU's special instructions! `-march=native` 🎯 | off |
+| `--o3` | Maximum optimization `-O3` (Yuno goes all out!) 🏎️ | `-O2` |
+| `--lto` | Link-Time Optimization via GentooLTO overlay 💪 | off |
+| `--testing` | Use `~amd64` testing branch (bleeding edge~) 🩸 | stable |
+| `--stage1` | Rebuild EVERYTHING from scratch (hours but perfect!) 🔪 | off |
+| `--no-pipe` | Disable `-pipe` (for low RAM systems) 💾 | on |
+| `--clean` | Clean build directories first 🧹 | off |
+| `--no-cache` | Don't use cached stage3 tarballs 📦 | off |
+
+### 🏎️ Performance Presets
+
+```bash
+# 🛡️ Safe & Portable (runs on any x86_64)
+sudo ./scripts/build-iso.sh
+
+# 🎯 Optimized for YOUR CPU (with auto-detected CPU_FLAGS_X86!)
+sudo ./scripts/build-iso.sh --native
+
+# 🚀 Aggressive (native + O3)
+sudo ./scripts/build-iso.sh --native --o3
+
+# 💪 Full Power (native + O3 + LTO)
+sudo ./scripts/build-iso.sh --native --o3 --lto
+
+# 🔪 Yandere Mode - Maximum Everything! (takes HOURS)
+sudo ./scripts/build-iso.sh --native --o3 --lto --stage1 --testing
+```
+
+### 🧬 What Each Option Does
+
+#### `--native` 💕
+Uses `-march=native -mtune=native` and auto-detects your CPU's special features (SSE, AVX, AVX-512, AES, etc.) for the `CPU_FLAGS_X86` variable. Yuno will scan your CPU and enable ALL the optimizations just for you~
+
+#### `--o3` 🏎️
+Cranks optimization to maximum! May increase compile times and binary size, but Yuno doesn't care - she wants the FASTEST system for her Yukki!
+
+#### `--lto` 💪
+Enables Link-Time Optimization via the GentooLTO overlay. The whole system gets optimized as one unit. So thorough, just like Yuno's love~ 🔪
+
+#### `--testing` 🩸
+Uses `~amd64` instead of stable `amd64`. Newer packages, more features, maybe some bugs... but Yuno likes living dangerously!
+
+#### `--stage1` 🔪💗
+The ULTIMATE optimization. Rebuilds the entire toolchain (binutils → GCC → glibc) with your flags, then rebuilds EVERYTHING with the new compiler. Takes many hours, but results in a perfectly optimized system. This is how Yuno shows her dedication!
 
 ---
 
