@@ -531,22 +531,29 @@ install_yuno_installer() {
 
     header "Installing Yuno OS installer"
 
-    # Build the Go TUI installer
-    log "Building TUI installer..."
+    # Build the Go tools
+    log "Building Yuno tools..."
     cd "$PROJECT_DIR"
 
     if [[ "$IS_GENTOO" == "true" ]]; then
+        log "Building yuno-tui..."
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$rootfs/usr/bin/yuno-tui" ./cmd/yuno-tui
+        log "Building yuno-use..."
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$rootfs/usr/bin/yuno-use" ./cmd/yuno-use
     else
         # Build inside the build environment
         cp -r "$PROJECT_DIR" "$BUILD_ENV_DIR/tmp/yuno-build"
         run_in_chroot "$BUILD_ENV_DIR" "cd /tmp/yuno-build && \
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/yuno-tui ./cmd/yuno-tui"
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/yuno-tui ./cmd/yuno-tui && \
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/yuno-use ./cmd/yuno-use"
         cp "$BUILD_ENV_DIR/tmp/yuno-tui" "$rootfs/usr/bin/yuno-tui"
-        rm -rf "$BUILD_ENV_DIR/tmp/yuno-build" "$BUILD_ENV_DIR/tmp/yuno-tui"
+        cp "$BUILD_ENV_DIR/tmp/yuno-use" "$rootfs/usr/bin/yuno-use"
+        rm -rf "$BUILD_ENV_DIR/tmp/yuno-build" "$BUILD_ENV_DIR/tmp/yuno-tui" "$BUILD_ENV_DIR/tmp/yuno-use"
     fi
 
     chmod +x "$rootfs/usr/bin/yuno-tui"
+    chmod +x "$rootfs/usr/bin/yuno-use"
+    log "Yuno tools installed: yuno-tui, yuno-use 💕"
 
     # Copy Calamares configuration
     if [[ -d "$PROJECT_DIR/calamares" ]]; then
@@ -685,14 +692,18 @@ EOF
     # Create welcome message
     cat > "$rootfs/etc/motd" << 'EOF'
 
-  Welcome to Yuno OS Live!
+  💕 Welcome to Yuno OS Live! 💕
 
   To install Yuno OS to your system, run:
     sudo yuno-tui
 
   Or click "Install Yuno OS" on the desktop.
 
-  Enjoy! - Yuno
+  💡 Helpful tools:
+    yuno-use    - Fix USE flag errors automatically!
+                  Example: emerge foo 2>&1 | sudo yuno-use
+
+  Enjoy! - Yuno 🔪
 
 EOF
 
