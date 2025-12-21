@@ -132,13 +132,19 @@ fetch_stage3() {
     if [[ -f "$stage3_path" ]]; then
         log "Stage3 already cached: $stage3_filename"
     else
-        log "Downloading: $stage3_filename"
-        wget -q --show-progress -O "$stage3_path" "$stage3_url"
+        log "Downloading: $stage3_filename (this may take a while)..."
+        # Download without progress to avoid stdout pollution
+        # Progress would interfere with command substitution
+        if ! wget -q -O "$stage3_path" "$stage3_url"; then
+            error "Failed to download stage3 tarball"
+        fi
+        log "Download complete: $stage3_filename"
 
         # Also fetch the signature for verification
         wget -q -O "$stage3_path.asc" "$stage3_url.asc" 2>/dev/null || true
     fi
 
+    # Return only the path to stdout
     echo "$stage3_path"
 }
 
