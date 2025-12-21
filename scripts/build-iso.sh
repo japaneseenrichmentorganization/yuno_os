@@ -325,6 +325,48 @@ install_packages() {
         log "LTO (Link Time Optimization) enabled"
     fi
 
+    # Detect CPU flags if using native optimizations
+    local cpu_flags=""
+    if [[ "$USE_NATIVE" == "true" ]]; then
+        # Try to detect CPU flags using cpuid2cpuflags if available
+        if command -v cpuid2cpuflags &> /dev/null; then
+            cpu_flags=$(cpuid2cpuflags | sed 's/CPU_FLAGS_X86: //')
+            log "Detected CPU flags: $cpu_flags"
+        else
+            # Fallback: detect common flags from /proc/cpuinfo
+            log "cpuid2cpuflags not found, detecting flags from /proc/cpuinfo..."
+            local detected_flags=""
+            local cpuinfo_flags=$(grep -m1 "^flags" /proc/cpuinfo | cut -d: -f2)
+
+            # Map common CPU features to Gentoo CPU_FLAGS_X86
+            [[ $cpuinfo_flags == *" mmx "* ]] && detected_flags="$detected_flags mmx"
+            [[ $cpuinfo_flags == *" mmxext "* ]] && detected_flags="$detected_flags mmxext"
+            [[ $cpuinfo_flags == *" sse "* ]] && detected_flags="$detected_flags sse"
+            [[ $cpuinfo_flags == *" sse2 "* ]] && detected_flags="$detected_flags sse2"
+            [[ $cpuinfo_flags == *" sse3 "* || $cpuinfo_flags == *" pni "* ]] && detected_flags="$detected_flags sse3"
+            [[ $cpuinfo_flags == *" ssse3 "* ]] && detected_flags="$detected_flags ssse3"
+            [[ $cpuinfo_flags == *" sse4_1 "* ]] && detected_flags="$detected_flags sse4_1"
+            [[ $cpuinfo_flags == *" sse4_2 "* ]] && detected_flags="$detected_flags sse4_2"
+            [[ $cpuinfo_flags == *" avx "* ]] && detected_flags="$detected_flags avx"
+            [[ $cpuinfo_flags == *" avx2 "* ]] && detected_flags="$detected_flags avx2"
+            [[ $cpuinfo_flags == *" avx512f "* ]] && detected_flags="$detected_flags avx512f"
+            [[ $cpuinfo_flags == *" avx512dq "* ]] && detected_flags="$detected_flags avx512dq"
+            [[ $cpuinfo_flags == *" avx512cd "* ]] && detected_flags="$detected_flags avx512cd"
+            [[ $cpuinfo_flags == *" avx512bw "* ]] && detected_flags="$detected_flags avx512bw"
+            [[ $cpuinfo_flags == *" avx512vl "* ]] && detected_flags="$detected_flags avx512vl"
+            [[ $cpuinfo_flags == *" aes "* ]] && detected_flags="$detected_flags aes"
+            [[ $cpuinfo_flags == *" pclmulqdq "* ]] && detected_flags="$detected_flags pclmul"
+            [[ $cpuinfo_flags == *" popcnt "* ]] && detected_flags="$detected_flags popcnt"
+            [[ $cpuinfo_flags == *" f16c "* ]] && detected_flags="$detected_flags f16c"
+            [[ $cpuinfo_flags == *" fma "* ]] && detected_flags="$detected_flags fma3"
+            [[ $cpuinfo_flags == *" bmi1 "* ]] && detected_flags="$detected_flags bmi"
+            [[ $cpuinfo_flags == *" bmi2 "* ]] && detected_flags="$detected_flags bmi2"
+
+            cpu_flags=$(echo $detected_flags | xargs)  # trim whitespace
+            log "Detected CPU flags: $cpu_flags"
+        fi
+    fi
+
     cat > "$rootfs/etc/portage/make.conf" << EOF
 COMMON_FLAGS="${march_flags} ${opt_flag} ${pipe_flag}"
 CFLAGS="\${COMMON_FLAGS}"
@@ -338,6 +380,15 @@ INPUT_DEVICES="libinput"
 GRUB_PLATFORMS="efi-64 pc"
 EOF
 
+    # Add CPU_FLAGS_X86 if detected
+    if [[ -n "$cpu_flags" ]]; then
+        cat >> "$rootfs/etc/portage/make.conf" << EOF
+
+# CPU-specific instruction set flags
+CPU_FLAGS_X86="${cpu_flags}"
+EOF
+    fi
+
     # Add LTO-specific configuration if enabled
     if [[ "$ENABLE_LTO" == "true" ]]; then
         cat >> "$rootfs/etc/portage/make.conf" << 'EOF'
@@ -350,6 +401,18 @@ EOF
     # Sync portage
     log "Syncing Portage tree..."
     run_in_chroot "$rootfs" "emerge-webrsync"
+
+    # Install cpuid2cpuflags inside chroot and regenerate flags if needed
+    if [[ "$USE_NATIVE" == "true" && -z "$cpu_flags" ]]; then
+        log "Installing cpuid2cpuflags for accurate CPU flag detection..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot app-portage/cpuid2cpuflags"
+        local chroot_cpu_flags
+        chroot_cpu_flags=$(run_in_chroot "$rootfs" "cpuid2cpuflags" | sed 's/CPU_FLAGS_X86: //')
+        if [[ -n "$chroot_cpu_flags" ]]; then
+            log "Detected CPU flags (via chroot): $chroot_cpu_flags"
+            echo "CPU_FLAGS_X86=\"${chroot_cpu_flags}\"" >> "$rootfs/etc/portage/make.conf"
+        fi
+    fi
 
     # Setup GentooLTO overlay if LTO is enabled
     if [[ "$ENABLE_LTO" == "true" ]]; then
