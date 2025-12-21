@@ -26,7 +26,7 @@ BUILD_ENV_DIR="$BUILD_DIR/gentoo-buildenv"
 # Gentoo settings
 GENTOO_MIRROR="${GENTOO_MIRROR:-https://distfiles.gentoo.org}"
 ARCH="amd64"
-STAGE3_VARIANT="desktop-openrc"
+INIT_SYSTEM="${INIT_SYSTEM:-openrc}"  # openrc or systemd
 
 # ISO settings
 ISO_NAME="yuno-os"
@@ -112,7 +112,7 @@ setup_directories() {
 
 fetch_stage3() {
     local target_dir="$1"
-    local variant="${2:-$STAGE3_VARIANT}"
+    local variant="${2:-desktop-${INIT_SYSTEM}}"
 
     log "Fetching latest stage3 tarball (variant: $variant)..."
 
@@ -278,6 +278,15 @@ install_packages() {
     # Configure make.conf for ISO build
     local nproc_count
     nproc_count=$(nproc)
+
+    # Set USE flags based on init system
+    local use_flags="X wayland pulseaudio pipewire networkmanager bluetooth"
+    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+        use_flags="$use_flags systemd"
+    else
+        use_flags="$use_flags -systemd"
+    fi
+
     cat > "$rootfs/etc/portage/make.conf" << EOF
 COMMON_FLAGS="-march=x86-64 -O2 -pipe"
 CFLAGS="\${COMMON_FLAGS}"
@@ -285,7 +294,7 @@ CXXFLAGS="\${COMMON_FLAGS}"
 MAKEOPTS="-j${nproc_count}"
 FEATURES="parallel-fetch candy getbinpkg"
 ACCEPT_LICENSE="*"
-USE="X wayland pulseaudio pipewire networkmanager bluetooth -systemd"
+USE="${use_flags}"
 VIDEO_CARDS="amdgpu radeonsi intel i965 iris nvidia nouveau virgl"
 INPUT_DEVICES="libinput"
 GRUB_PLATFORMS="efi-64 pc"
@@ -298,9 +307,13 @@ EOF
     log "Syncing Portage tree..."
     run_in_chroot "$rootfs" "emerge-webrsync"
 
-    # Select profile
-    log "Selecting desktop profile..."
-    run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop"
+    # Select profile based on init system
+    log "Selecting desktop profile (${INIT_SYSTEM})..."
+    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+        run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop/systemd"
+    else
+        run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop"
+    fi
 
     # Update @world first
     log "Updating @world..."
@@ -323,10 +336,16 @@ EOF
         x11-misc/sddm"
 
     log "Installing system utilities..."
+    local logger_pkg=""
+    if [[ "$INIT_SYSTEM" == "openrc" ]]; then
+        logger_pkg="app-admin/metalog"
+    fi
+    # systemd uses journald, no separate logger needed
+
     run_in_chroot "$rootfs" "emerge --ask=n --quiet-build \
         net-misc/networkmanager \
         sys-apps/dbus \
-        app-admin/metalog \
+        ${logger_pkg} \
         app-misc/fastfetch \
         app-editors/nano \
         app-editors/vim \
@@ -453,12 +472,18 @@ EOF
     run_in_chroot "$rootfs" "locale-gen"
     echo "LANG=en_US.UTF-8" > "$rootfs/etc/locale.conf"
 
-    # Enable services
-    log "Enabling services..."
-    run_in_chroot "$rootfs" "rc-update add dbus default"
-    run_in_chroot "$rootfs" "rc-update add NetworkManager default"
-    run_in_chroot "$rootfs" "rc-update add metalog default"
-    run_in_chroot "$rootfs" "rc-update add sddm default" || true
+    # Enable services based on init system
+    log "Enabling services (${INIT_SYSTEM})..."
+    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+        run_in_chroot "$rootfs" "systemctl enable dbus"
+        run_in_chroot "$rootfs" "systemctl enable NetworkManager"
+        run_in_chroot "$rootfs" "systemctl enable sddm" || true
+    else
+        run_in_chroot "$rootfs" "rc-update add dbus default"
+        run_in_chroot "$rootfs" "rc-update add NetworkManager default"
+        run_in_chroot "$rootfs" "rc-update add metalog default"
+        run_in_chroot "$rootfs" "rc-update add sddm default" || true
+    fi
 
     # Create live user
     log "Creating live user..."
@@ -659,7 +684,7 @@ EOF
 
 create_iso() {
     local iso_dir="$BUILD_DIR/iso"
-    local output_iso="$OUTPUT_DIR/${ISO_NAME}-${ISO_VERSION}.iso"
+    local output_iso="$OUTPUT_DIR/${ISO_NAME}-${ISO_VERSION}-${INIT_SYSTEM}.iso"
 
     header "Creating ISO image"
 
@@ -748,15 +773,22 @@ show_usage() {
     echo "Build a Yuno OS installation ISO"
     echo ""
     echo "Options:"
+    echo "  --init-system   Init system to use: openrc (default) or systemd"
     echo "  --clean         Clean build directories before starting"
     echo "  --no-cache      Don't use cached stage3 tarballs"
     echo "  --help          Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                        # Build with OpenRC (default)"
+    echo "  $0 --init-system systemd  # Build with systemd"
+    echo "  $0 --init-system openrc   # Build with OpenRC"
     echo ""
     echo "Environment Variables:"
     echo "  BUILD_DIR       Build directory (default: /var/tmp/yuno-build)"
     echo "  CACHE_DIR       Cache directory (default: /var/cache/yuno)"
     echo "  OUTPUT_DIR      Output directory (default: ./output)"
     echo "  GENTOO_MIRROR   Gentoo mirror URL"
+    echo "  INIT_SYSTEM     Init system: openrc or systemd (default: openrc)"
     echo ""
     echo "This script can be run from any Linux distribution."
     echo "If not running on Gentoo, a build environment will be bootstrapped automatically."
@@ -769,6 +801,13 @@ main() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --init-system)
+                INIT_SYSTEM="$2"
+                if [[ "$INIT_SYSTEM" != "openrc" && "$INIT_SYSTEM" != "systemd" ]]; then
+                    error "Invalid init system: $INIT_SYSTEM (must be 'openrc' or 'systemd')"
+                fi
+                shift 2
+                ;;
             --clean)
                 clean_build=true
                 shift
@@ -789,6 +828,7 @@ main() {
 
     header "Yuno OS ISO Build Script"
 
+    log "Init system: ${INIT_SYSTEM}"
     if [[ "$IS_GENTOO" == "true" ]]; then
         log "Running on Gentoo Linux"
     else
