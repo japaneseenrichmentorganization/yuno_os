@@ -28,6 +28,12 @@ GENTOO_MIRROR="${GENTOO_MIRROR:-https://distfiles.gentoo.org}"
 ARCH="amd64"
 INIT_SYSTEM="${INIT_SYSTEM:-openrc}"  # openrc or systemd
 
+# Build optimization settings
+USE_NATIVE="${USE_NATIVE:-false}"      # Use -march=native -mtune=native
+OPT_LEVEL="${OPT_LEVEL:-2}"            # Optimization level: 2 or 3
+ENABLE_LTO="${ENABLE_LTO:-false}"      # Enable LTO via GentooLTO overlay
+USE_PIPE="${USE_PIPE:-true}"           # Use -pipe (faster, uses more RAM)
+
 # ISO settings
 ISO_NAME="yuno-os"
 ISO_VERSION="1.0"
@@ -285,6 +291,26 @@ install_packages() {
     local nproc_count
     nproc_count=$(nproc)
 
+    # Set compiler flags based on optimization settings
+    local march_flags
+    if [[ "$USE_NATIVE" == "true" ]]; then
+        march_flags="-march=native -mtune=native"
+        log "Using native CPU optimizations (-march=native -mtune=native)"
+    else
+        march_flags="-march=x86-64 -mtune=generic"
+        log "Using generic x86-64 optimizations (portable)"
+    fi
+
+    local opt_flag="-O${OPT_LEVEL}"
+    log "Optimization level: ${opt_flag}"
+
+    # Set pipe flag
+    local pipe_flag=""
+    if [[ "$USE_PIPE" == "true" ]]; then
+        pipe_flag="-pipe"
+        log "Using -pipe (faster compilation, requires more RAM)"
+    fi
+
     # Set USE flags based on init system
     local use_flags="X wayland pulseaudio pipewire networkmanager bluetooth"
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
@@ -293,8 +319,14 @@ install_packages() {
         use_flags="$use_flags -systemd"
     fi
 
+    # Add LTO USE flag if enabled
+    if [[ "$ENABLE_LTO" == "true" ]]; then
+        use_flags="$use_flags lto"
+        log "LTO (Link Time Optimization) enabled"
+    fi
+
     cat > "$rootfs/etc/portage/make.conf" << EOF
-COMMON_FLAGS="-march=x86-64 -O2 -pipe"
+COMMON_FLAGS="${march_flags} ${opt_flag} ${pipe_flag}"
 CFLAGS="\${COMMON_FLAGS}"
 CXXFLAGS="\${COMMON_FLAGS}"
 MAKEOPTS="-j${nproc_count}"
@@ -306,9 +338,26 @@ INPUT_DEVICES="libinput"
 GRUB_PLATFORMS="efi-64 pc"
 EOF
 
+    # Add LTO-specific configuration if enabled
+    if [[ "$ENABLE_LTO" == "true" ]]; then
+        cat >> "$rootfs/etc/portage/make.conf" << 'EOF'
+
+# LTO Configuration
+LDFLAGS="${LDFLAGS} -fuse-linker-plugin"
+EOF
+    fi
+
     # Sync portage
     log "Syncing Portage tree..."
     run_in_chroot "$rootfs" "emerge-webrsync"
+
+    # Setup GentooLTO overlay if LTO is enabled
+    if [[ "$ENABLE_LTO" == "true" ]]; then
+        log "Setting up GentooLTO overlay..."
+        run_in_chroot "$rootfs" "emerge --ask=n app-eselect/eselect-repository"
+        run_in_chroot "$rootfs" "eselect repository enable lto-overlay"
+        run_in_chroot "$rootfs" "emerge --sync lto-overlay"
+    fi
 
     # Select profile based on init system
     log "Selecting desktop profile (${INIT_SYSTEM})..."
@@ -776,15 +825,21 @@ show_usage() {
     echo "Build a Yuno OS installation ISO"
     echo ""
     echo "Options:"
-    echo "  --init-system   Init system to use: openrc (default) or systemd"
-    echo "  --clean         Clean build directories before starting"
-    echo "  --no-cache      Don't use cached stage3 tarballs"
-    echo "  --help          Show this help message"
+    echo "  --init-system SYS   Init system: openrc (default) or systemd"
+    echo "  --native            Use -march=native -mtune=native (CPU-specific optimizations)"
+    echo "  --o3                Use -O3 optimization (default: -O2)"
+    echo "  --lto               Enable LTO (Link Time Optimization) via GentooLTO overlay"
+    echo "  --no-pipe           Disable -pipe flag (use if low on RAM)"
+    echo "  --clean             Clean build directories before starting"
+    echo "  --no-cache          Don't use cached stage3 tarballs"
+    echo "  --help              Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                        # Build with OpenRC (default)"
-    echo "  $0 --init-system systemd  # Build with systemd"
-    echo "  $0 --init-system openrc   # Build with OpenRC"
+    echo "  $0                                    # Build with defaults (OpenRC, -O2, generic)"
+    echo "  $0 --init-system systemd              # Build with systemd"
+    echo "  $0 --native --o3                      # Native CPU opts with -O3"
+    echo "  $0 --native --o3 --lto                # Full optimization with LTO"
+    echo "  $0 --init-system systemd --native     # systemd with native optimizations"
     echo ""
     echo "Environment Variables:"
     echo "  BUILD_DIR       Build directory (default: /var/tmp/yuno-build)"
@@ -792,6 +847,10 @@ show_usage() {
     echo "  OUTPUT_DIR      Output directory (default: ./output)"
     echo "  GENTOO_MIRROR   Gentoo mirror URL"
     echo "  INIT_SYSTEM     Init system: openrc or systemd (default: openrc)"
+    echo "  USE_NATIVE      Use native CPU flags: true or false (default: false)"
+    echo "  OPT_LEVEL       Optimization level: 2 or 3 (default: 2)"
+    echo "  ENABLE_LTO      Enable LTO: true or false (default: false)"
+    echo "  USE_PIPE        Use -pipe flag: true or false (default: true)"
     echo ""
     echo "This script can be run from any Linux distribution."
     echo "If not running on Gentoo, a build environment will be bootstrapped automatically."
@@ -810,6 +869,22 @@ main() {
                     error "Invalid init system: $INIT_SYSTEM (must be 'openrc' or 'systemd')"
                 fi
                 shift 2
+                ;;
+            --native)
+                USE_NATIVE=true
+                shift
+                ;;
+            --o3)
+                OPT_LEVEL=3
+                shift
+                ;;
+            --lto)
+                ENABLE_LTO=true
+                shift
+                ;;
+            --no-pipe)
+                USE_PIPE=false
+                shift
                 ;;
             --clean)
                 clean_build=true
@@ -832,6 +907,8 @@ main() {
     header "Yuno OS ISO Build Script"
 
     log "Init system: ${INIT_SYSTEM}"
+    log "Compiler flags: march=$([ "$USE_NATIVE" == "true" ] && echo "native" || echo "x86-64") -O${OPT_LEVEL} $([ "$USE_PIPE" == "true" ] && echo "-pipe" || echo "")"
+    [[ "$ENABLE_LTO" == "true" ]] && log "LTO: enabled"
     if [[ "$IS_GENTOO" == "true" ]]; then
         log "Running on Gentoo Linux"
     else
