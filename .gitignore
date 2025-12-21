@@ -1,6 +1,7 @@
 # Binaries
 yuno-tui
 yuno-gui
+yuno-use
 *.exe
 *.dll
 *.so
@@ -52,3 +53,6 @@ __pycache__/
 # Testing
 coverage.out
 *.test
+
+# Conversation logs
+convo.txt

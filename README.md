@@ -91,6 +91,9 @@ Whether you're a seasoned Gentoo veteran or a curious newcomer, Yuno OS provides
 - **Kernel Selection** - Choose your kernel type 🐧
 - **USE Flag Presets** - Desktop, gaming, server, minimal 🎛️
 
+### 🔧 Yuno's Helper Tools
+- **yuno-use** - Automatically fix USE flag errors! Just pipe emerge output~ 💕
+
 ---
 
 ## 📥 Installation
@@ -260,12 +263,71 @@ The ULTIMATE optimization. Rebuilds the entire toolchain (binutils → GCC → g
 
 ---
 
+## 🔧 yuno-use - USE Flag Fixer
+
+Tired of manually editing `/etc/portage/package.use` files? Yuno will do it for you! 💕
+
+Just pipe your emerge output to `yuno-use` and she'll create all the necessary package.use files automatically~
+
+### Installation
+
+```bash
+# Build it
+go build -o yuno-use ./cmd/yuno-use
+
+# Install system-wide (optional)
+sudo cp yuno-use /usr/local/bin/
+```
+
+### Usage
+
+```bash
+# Fix USE flags automatically! 💕
+emerge dev-libs/foo 2>&1 | sudo yuno-use
+
+# Preview what would be done first
+emerge -pv @world 2>&1 | yuno-use --dry-run
+
+# Save emerge output and process later
+emerge -pv big-package > emerge-output.txt 2>&1
+sudo yuno-use < emerge-output.txt
+```
+
+### What It Does 🔪
+
+When emerge complains about USE flags like:
+```
+The following USE changes are necessary to proceed:
+>=dev-libs/openssl-3.0.0 -bindist
+>=app-crypt/gnupg-2.0 smartcard tools
+```
+
+Yuno will automatically create:
+- `/etc/portage/package.use/openssl.use` with `>=dev-libs/openssl-3.0.0 -bindist`
+- `/etc/portage/package.use/gnupg.use` with `>=app-crypt/gnupg-2.0 smartcard tools`
+
+She also handles `package.accept_keywords` for keyword unmasks! 🔑
+
+### Options
+
+| Flag | Description |
+|:----:|:------------|
+| `-n, --dry-run` | Show what would be done without making changes |
+| `-v, --verbose` | Show detailed parsing information |
+| `-d, --dir` | Use custom package.use directory |
+| `-h, --help` | Show help message |
+
+No more manual file editing! Yuno takes care of everything~ 💕🔪
+
+---
+
 ## 📁 Project Structure
 
 ```
 yuno-os/
 ├── 💕 cmd/                    # Entry points
-│   └── yuno-tui/              # TUI installer
+│   ├── yuno-tui/              # TUI installer
+│   └── yuno-use/              # USE flag fixer tool
 ├── 📦 pkg/                    # Core libraries
 │   ├── config/                # Configuration types
 │   ├── utils/                 # Utilities
