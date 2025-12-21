@@ -555,6 +555,14 @@ install_yuno_installer() {
     chmod +x "$rootfs/usr/bin/yuno-use"
     log "Yuno tools installed: yuno-tui, yuno-use 💕"
 
+    # Install man pages
+    log "Installing man pages..."
+    mkdir -p "$rootfs/usr/share/man/man1"
+    if [[ -f "$PROJECT_DIR/man/yuno-use.1" ]]; then
+        cp "$PROJECT_DIR/man/yuno-use.1" "$rootfs/usr/share/man/man1/"
+        gzip -f "$rootfs/usr/share/man/man1/yuno-use.1" 2>/dev/null || true
+    fi
+
     # Copy Calamares configuration
     if [[ -d "$PROJECT_DIR/calamares" ]]; then
         mkdir -p "$rootfs/etc/calamares"

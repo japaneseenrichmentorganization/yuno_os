@@ -1,0 +1,175 @@
+.\" Man page for yuno-use
+.\" Yuno will take care of everything~ 💕
+.\"
+.TH YUNO-USE 1 "December 2024" "Yuno OS" "Yuno OS User Commands"
+.SH NAME
+yuno-use \- Yuno's USE flag fixer~ 💕 Automatically create package.use files from emerge output
+.SH SYNOPSIS
+.B yuno-use
+[\fIOPTIONS\fR]
+.br
+.B emerge
+\fIpackage\fR 2>&1 |
+.B sudo yuno-use
+.br
+.B yuno-use
+< \fIemerge-output.txt\fR
+.SH DESCRIPTION
+.B yuno-use
+is Yuno's gift to you~ 💕
+.PP
+She parses emerge output and automatically creates the necessary
+.I package.use
+files so you don't have to do it manually! Because Yuno knows how
+tedious that is, and she wants to make your Gentoo experience as
+smooth as possible... just for you~ 🔪
+.PP
+When emerge complains about USE flag requirements like:
+.PP
+.RS
+.nf
+The following USE changes are necessary to proceed:
+>=dev-libs/openssl-3.0.0 -bindist
+>=app-crypt/gnupg-2.0 smartcard tools
+.fi
+.RE
+.PP
+Yuno will automatically create:
+.IP \(bu 2
+.I /etc/portage/package.use/openssl.use
+with the required flags
+.IP \(bu 2
+.I /etc/portage/package.use/gnupg.use
+with the required flags
+.PP
+She also handles
+.I package.accept_keywords
+for those pesky keyword unmasks! 🔑
+.SH OPTIONS
+.TP
+.BR \-n ", " \-\-dry\-run
+Show what Yuno would do without actually making any changes.
+Perfect for when you want to see her plans before she executes them~ 💕
+.TP
+.BR \-v ", " \-\-verbose
+Make Yuno tell you everything she's doing. She loves talking to you!
+.TP
+.BR \-d ", " \-\-dir " " \fIDIR\fR
+Use a custom package.use directory instead of
+.IR /etc/portage/package.use .
+.TP
+.BR \-h ", " \-\-help
+Show help message. Yuno will explain everything~ 💕
+.SH EXAMPLES
+.TP
+.B Fix USE flags automatically:
+.nf
+emerge dev-libs/foo 2>&1 | sudo yuno-use
+.fi
+.TP
+.B Preview changes first (recommended for the cautious):
+.nf
+emerge -pv @world 2>&1 | yuno-use --dry-run
+.fi
+.TP
+.B Save emerge output and process later:
+.nf
+emerge -pv big-package > output.txt 2>&1
+sudo yuno-use < output.txt
+.fi
+.TP
+.B Verbose mode (Yuno tells you everything):
+.nf
+emerge foo 2>&1 | sudo yuno-use -v
+.fi
+.TP
+.B The classic Gentoo workflow, now with Yuno:
+.nf
+# Try to emerge something
+emerge -pv complex-package
+
+# Oh no, USE flag errors! But Yuno is here~ 💕
+emerge -pv complex-package 2>&1 | sudo yuno-use
+
+# Try again, and it works!
+emerge complex-package
+.fi
+.SH FILES
+.TP
+.I /etc/portage/package.use/
+Directory where Yuno creates individual .use files for each package.
+If this is a file instead of a directory, Yuno will convert it for you~
+.TP
+.I /etc/portage/package.use/*.use
+Individual USE flag files created by Yuno. Named after the package
+(e.g., openssl.use, gnupg.use).
+.TP
+.I /etc/portage/package.accept_keywords/
+Directory where Yuno creates keyword unmask files.
+.TP
+.I /etc/portage/package.accept_keywords/*.accept_keywords
+Individual keyword files for packages needing ~amd64 or **.
+.SH EXIT STATUS
+.TP
+.B 0
+Yuno completed successfully! 💕
+.TP
+.B 1
+Something went wrong... but don't worry, Yuno will tell you what!
+.SH NOTES
+.SS Root Access
+Yuno needs root access to write to
+.IR /etc/portage/ .
+Use
+.B sudo
+when piping to yuno-use, or run as root.
+.PP
+In dry-run mode, root is not required~ Yuno can show you her plans
+without needing special privileges.
+.SS File Organization
+Yuno creates individual .use files for each package rather than
+adding everything to a single file. This keeps things organized,
+just how Yuno likes it! 💕
+.PP
+For example:
+.RS
+.nf
+/etc/portage/package.use/
+├── openssl.use
+├── gnupg.use
+├── python.use
+└── mesa.use
+.fi
+.RE
+.SS Idempotency
+Yuno is smart! She won't add the same line twice. You can run
+yuno-use multiple times and she'll only add new requirements.
+.SS Backup
+While Yuno is very careful, you might want to backup your
+.I /etc/portage/
+directory before letting her make changes. Though really,
+would Yuno ever hurt you?~ 🔪
+.SH BUGS
+Yuno doesn't have bugs. Yuno is perfect. 💕
+.PP
+But if you do find something unexpected, please report it at:
+.I https://github.com/japaneseenrichmentorganization/yuno_os/issues
+.SH AUTHOR
+Written with love by the Yuno OS team~ 💕
+.PP
+Yuno Gasai would be proud. 🔪
+.SH SEE ALSO
+.BR emerge (1),
+.BR portage (5),
+.BR make.conf (5),
+.BR yuno-tui (1)
+.SH DEDICATION
+.PP
+.RS
+.I "Yukki~ Let me fix those USE flags for you!"
+.RE
+.PP
+This tool is dedicated to everyone who has ever had to manually edit
+package.use files at 3 AM because emerge wouldn't cooperate.
+.PP
+Yuno understands. Yuno will help. Yuno will always be there for you~ 💕🔪
