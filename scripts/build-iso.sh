@@ -31,10 +31,11 @@ INIT_SYSTEM="${INIT_SYSTEM:-openrc}"  # openrc or systemd
 # Build optimization settings
 USE_NATIVE="${USE_NATIVE:-false}"      # Use -march=native -mtune=native
 OPT_LEVEL="${OPT_LEVEL:-2}"            # Optimization level: 2 or 3
-ENABLE_LTO="${ENABLE_LTO:-false}"      # Enable LTO via GentooLTO overlay
+ENABLE_LTO="${ENABLE_LTO:-false}"      # Enable LTO (native Gentoo support)
 USE_PIPE="${USE_PIPE:-true}"           # Use -pipe (faster, uses more RAM)
 USE_TESTING="${USE_TESTING:-false}"    # Use ~amd64 (testing) instead of stable
 STAGE1_BUILD="${STAGE1_BUILD:-false}"  # Rebuild toolchain from scratch (stage1)
+USE_GCC_SNAPSHOT="${USE_GCC_SNAPSHOT:-false}"  # Use GCC snapshots from toolchain overlay (e.g., GCC 16)
 
 # ISO settings
 ISO_NAME="yuno-os"
@@ -439,10 +440,63 @@ EOF
         run_in_chroot "$rootfs" "eselect profile set default/linux/amd64/23.0/desktop"
     fi
 
-    # Handle GCC upgrade for testing branch
-    # When using ~amd64, we likely have a newer GCC available that needs to be
-    # installed and set as the default compiler before building other packages
-    if [[ "$USE_TESTING" == "true" ]]; then
+    # Setup toolchain overlay for GCC snapshots (e.g., GCC 16)
+    # This overlay provides bleeding-edge compiler snapshots
+    if [[ "$USE_GCC_SNAPSHOT" == "true" ]]; then
+        header "Setting up GCC snapshot from toolchain overlay"
+        warn "GCC snapshots are EXPERIMENTAL - expect potential issues!"
+
+        # Install eselect-repository and git for overlay management
+        log "Installing overlay management tools..."
+        run_in_chroot "$rootfs" "emerge --ask=n app-eselect/eselect-repository dev-vcs/git"
+
+        # Add the official Gentoo toolchain overlay
+        # This overlay contains GCC snapshots (including GCC 16)
+        log "Adding Gentoo toolchain overlay..."
+        run_in_chroot "$rootfs" "eselect repository enable toolchain"
+        run_in_chroot "$rootfs" "emaint sync -r toolchain"
+
+        # Unmask the latest GCC snapshot
+        # The toolchain overlay uses ** for live/snapshot ebuilds
+        log "Unmasking GCC snapshots..."
+        mkdir -p "$rootfs/etc/portage/package.accept_keywords"
+        cat > "$rootfs/etc/portage/package.accept_keywords/gcc-snapshot" << 'EOF'
+# Accept GCC snapshots from toolchain overlay
+sys-devel/gcc::toolchain **
+EOF
+
+        # Install the latest GCC from the toolchain overlay
+        log "Installing latest GCC snapshot (this may take a while)..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/gcc::toolchain"
+
+        # Get the list of installed GCC versions and select the newest (snapshot)
+        log "Switching to GCC snapshot..."
+        run_in_chroot "$rootfs" "
+            # List available GCC versions
+            gcc-config -l
+
+            # Get the newest version (should be the snapshot, last in list)
+            NEWEST_GCC=\$(gcc-config -l | tail -1 | awk '{print \$2}' | tr -d '[]')
+
+            if [[ -n \"\$NEWEST_GCC\" ]]; then
+                echo \"Switching to GCC profile: \$NEWEST_GCC\"
+                gcc-config \"\$NEWEST_GCC\"
+            fi
+        "
+
+        # Update environment
+        run_in_chroot "$rootfs" "env-update && source /etc/profile"
+
+        # Verify GCC version
+        log "GCC snapshot version:"
+        run_in_chroot "$rootfs" "gcc --version | head -1"
+
+        # Rebuild libtool for new GCC
+        log "Rebuilding libtool for GCC snapshot..."
+        run_in_chroot "$rootfs" "emerge --ask=n --oneshot sys-devel/libtool" || true
+
+    # Handle GCC upgrade for testing branch (when not using snapshots)
+    elif [[ "$USE_TESTING" == "true" ]]; then
         header "Upgrading GCC for testing branch"
         log "Testing branch (~amd64) detected - checking for newer GCC..."
 
@@ -1033,8 +1087,9 @@ show_usage() {
     echo "  --init-system SYS   Init system: openrc (default) or systemd"
     echo "  --native            Use -march=native -mtune=native (CPU-specific optimizations)"
     echo "  --o3                Use -O3 optimization (default: -O2)"
-    echo "  --lto               Enable LTO (Link Time Optimization) via GentooLTO overlay"
+    echo "  --lto               Enable LTO (Link Time Optimization)"
     echo "  --testing           Use ~amd64 testing branch (default: stable amd64)"
+    echo "  --gcc-snapshot      Use latest GCC snapshot (e.g., GCC 16) from toolchain overlay"
     echo "  --stage1            Rebuild toolchain from scratch (VERY slow, maximum optimization)"
     echo "  --no-pipe           Disable -pipe flag (use if low on RAM)"
     echo "  --clean             Clean build directories before starting"
@@ -1047,6 +1102,7 @@ show_usage() {
     echo "  $0 --native --o3                      # Native CPU opts with -O3"
     echo "  $0 --native --o3 --lto                # Full optimization with LTO"
     echo "  $0 --testing                          # Use ~amd64 testing packages"
+    echo "  $0 --gcc-snapshot --testing           # Use GCC 16 snapshots with testing"
     echo "  $0 --native --o3 --lto --stage1       # Maximum optimization (takes hours!)"
     echo ""
     echo "Environment Variables:"
@@ -1061,6 +1117,7 @@ show_usage() {
     echo "  USE_PIPE        Use -pipe flag: true or false (default: true)"
     echo "  USE_TESTING     Use ~amd64 testing: true or false (default: false)"
     echo "  STAGE1_BUILD    Rebuild toolchain: true or false (default: false)"
+    echo "  USE_GCC_SNAPSHOT Use GCC snapshots from toolchain overlay: true or false (default: false)"
     echo ""
     echo "This script can be run from any Linux distribution."
     echo "If not running on Gentoo, a build environment will be bootstrapped automatically."
@@ -1096,6 +1153,10 @@ main() {
                 USE_TESTING=true
                 shift
                 ;;
+            --gcc-snapshot)
+                USE_GCC_SNAPSHOT=true
+                shift
+                ;;
             --stage1)
                 STAGE1_BUILD=true
                 shift
@@ -1128,6 +1189,7 @@ main() {
     log "Compiler flags: march=$([ "$USE_NATIVE" == "true" ] && echo "native" || echo "x86-64") -O${OPT_LEVEL} $([ "$USE_PIPE" == "true" ] && echo "-pipe" || echo "")"
     log "Package branch: $([ "$USE_TESTING" == "true" ] && echo "~amd64 (testing)" || echo "amd64 (stable)")"
     [[ "$ENABLE_LTO" == "true" ]] && log "LTO: enabled"
+    [[ "$USE_GCC_SNAPSHOT" == "true" ]] && warn "GCC snapshot: enabled (using bleeding-edge GCC from toolchain overlay)"
     [[ "$STAGE1_BUILD" == "true" ]] && warn "Stage1 build: enabled (this will take a LONG time!)"
     if [[ "$IS_GENTOO" == "true" ]]; then
         log "Running on Gentoo Linux"
